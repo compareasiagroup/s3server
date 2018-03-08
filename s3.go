@@ -56,10 +56,10 @@ func (c *s3Provider) List(ctx context.Context, prefix string) (files []object, e
 	return files, nil
 }
 
-// ServeHTTP gets files with c.basePath from the S3 bucket.
+// ServeHTTP gets files with c.basePath from the S3 bucket
 func (c *s3Provider) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	key := strings.TrimPrefix(req.URL.Path, c.basePath)
-	logrus.Infof("Getting Module: %q", key)
+	logrus.Infof("Serving Module: %q from %q", key, c.bucket)
 	input := &s3.GetObjectInput{
 		Bucket: aws.String(c.bucket),
 		Key:    aws.String(key),
