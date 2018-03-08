@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -12,7 +13,6 @@ import (
 	"text/template"
 	"time"
 
-	"cloud.google.com/go/storage"
 	units "github.com/docker/go-units"
 	"github.com/jessfraz/s3server/version"
 	"github.com/sirupsen/logrus"
@@ -20,16 +20,10 @@ import (
 
 const (
 	// BANNER is what is printed for help/info output.
-	BANNER = `     _        _   _
- ___| |_ __ _| |_(_) ___ ___  ___ _ ____   _____ _ __
-/ __| __/ _` + "`" + ` | __| |/ __/ __|/ _ \ '__\ \ / / _ \ '__|
-\__ \ || (_| | |_| | (__\__ \  __/ |   \ V /  __/ |
-|___/\__\__,_|\__|_|\___|___/\___|_|    \_/ \___|_|
-
- Server to index & view files in a s3 or Google Cloud Storage bucket.
+	BANNER = `
+ Server to index & view files from s3 bucket.
  Version: %s
  Build: %s
-
 `
 )
 
@@ -158,14 +152,15 @@ type data struct {
 func createStaticIndex(p cloud, staticDir string) error {
 	updating = true
 
-	// get the files
-	max := 2000
-	q := &storage.Query{
-		Prefix: p.Prefix(),
-	}
-
 	logrus.Infof("fetching files from %s", p.BaseURL())
-	files, err := p.List(p.Prefix(), p.Prefix(), "", max, q)
+	ctx := context.Background()
+	var cancelFn func()
+	// if timeout > 0 {
+	// 	ctx, cancelFn = context.WithTimeout(ctx, timeout)
+	// }
+	defer cancelFn()
+
+	files, err := p.List(ctx, p.Prefix())
 	if err != nil {
 		return fmt.Errorf("Listing all files in bucket failed: %v", err)
 	}

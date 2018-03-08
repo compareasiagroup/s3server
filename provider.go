@@ -2,55 +2,30 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
-	"cloud.google.com/go/storage"
-	"github.com/mitchellh/goamz/aws"
-	"github.com/mitchellh/goamz/s3"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/sirupsen/logrus"
 )
 
 type cloud interface {
-	List(prefix, delimiter, marker string, max int, q *storage.Query) ([]object, error)
+	List(ctx context.Context, prefix string) ([]object, error)
 	Prefix() string
 	BaseURL() string
 }
 
 func newProvider(provider, bucket, s3Region, s3AccessKey, s3SecretKey string) (cloud, error) {
-	if provider == "s3" {
-		// auth with aws
-		auth, err := aws.GetAuth(s3AccessKey, s3SecretKey)
-		if err != nil {
-			return nil, err
-		}
+	conf := initAwsConfig(s3Region, s3AccessKey, s3SecretKey)
 
-		// create the client
-		region, err := getRegion(s3Region)
-		if err != nil {
-			return nil, err
-		}
-
-		p := s3Provider{bucket: bucket}
-		p.client = s3.New(auth, region)
-		bucket, p.prefix = cleanBucketName(p.bucket)
-		p.b = p.client.Bucket(bucket)
-		p.baseURL = p.bucket + ".s3.amazonaws.com"
-		return &p, nil
-	}
-
-	p := gcsProvider{bucket: bucket}
-	p.ctx = context.Background()
-	client, err := storage.NewClient(p.ctx)
-	if err != nil {
-		return nil, err
-	}
-	p.client = client
+	p := s3Provider{}
+	p.client = s3.New(session.New(conf))
 	p.bucket, p.prefix = cleanBucketName(p.bucket)
-	p.b = client.Bucket(p.bucket)
-	p.baseURL = p.bucket
-	if !strings.Contains(p.bucket, "j3ss.co") {
-		p.baseURL += ".storage.googleapis.com"
-	}
+	p.baseURL = p.bucket + ".s3.amazonaws.com"
+
+	logrus.Info("baseURL: %q", p.baseURL)
 	return &p, nil
 }
 
@@ -58,7 +33,6 @@ func newProvider(provider, bucket, s3Region, s3AccessKey, s3SecretKey string) (c
 // for a given s3bucket.
 func cleanBucketName(bucket string) (string, string) {
 	bucket = strings.TrimPrefix(bucket, "s3://")
-	bucket = strings.TrimPrefix(bucket, "gcs://")
 	parts := strings.SplitN(bucket, "/", 2)
 	if len(parts) == 1 {
 		return bucket, "/"
@@ -67,23 +41,19 @@ func cleanBucketName(bucket string) (string, string) {
 	return parts[0], parts[1]
 }
 
-// getRegion returns the aws region that is matches a given string.
-func getRegion(name string) (aws.Region, error) {
-	var regions = map[string]aws.Region{
-		aws.APNortheast.Name:  aws.APNortheast,
-		aws.APSoutheast.Name:  aws.APSoutheast,
-		aws.APSoutheast2.Name: aws.APSoutheast2,
-		aws.EUCentral.Name:    aws.EUCentral,
-		aws.EUWest.Name:       aws.EUWest,
-		aws.USEast.Name:       aws.USEast,
-		aws.USWest.Name:       aws.USWest,
-		aws.USWest2.Name:      aws.USWest2,
-		aws.USGovWest.Name:    aws.USGovWest,
-		aws.SAEast.Name:       aws.SAEast,
-	}
-	region, ok := regions[name]
-	if !ok {
-		return aws.Region{}, fmt.Errorf("No region matches %s", name)
-	}
-	return region, nil
+func initAwsConfig(region, accessKey, secretKey string) *aws.Config {
+	awsConfig := aws.NewConfig()
+	creds := credentials.NewChainCredentials([]credentials.Provider{
+		&credentials.StaticProvider{
+			Value: credentials.Value{
+				AccessKeyID:     accessKey,
+				SecretAccessKey: secretKey,
+			},
+		},
+		&credentials.EnvProvider{},
+		&credentials.SharedCredentialsProvider{},
+	})
+	awsConfig.WithCredentials(creds)
+	awsConfig.WithRegion(region)
+	return awsConfig
 }
