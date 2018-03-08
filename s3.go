@@ -6,7 +6,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/sirupsen/logrus"
 )
 
 type s3Provider struct {
@@ -19,7 +18,6 @@ type s3Provider struct {
 
 // List returns the files in an s3 bucket.
 func (c *s3Provider) List(ctx context.Context, prefix string) (files []object, err error) {
-	logrus.Info("about to list files")
 	err = c.client.ListObjectsPagesWithContext(ctx, &s3.ListObjectsInput{
 		Bucket: aws.String(c.bucket),
 		Prefix: aws.String(prefix),
@@ -37,9 +35,6 @@ func (c *s3Provider) List(ctx context.Context, prefix string) (files []object, e
 	if err != nil {
 		panic(fmt.Sprintf("failed to list objects for bucket, %s, %v", c.bucket, err))
 	}
-
-	fmt.Println("Objects in bucket:", files)
-
 	return files, nil
 }
 

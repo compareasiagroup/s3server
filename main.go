@@ -154,11 +154,11 @@ func createStaticIndex(p cloud, staticDir string) error {
 
 	logrus.Infof("fetching files from %s", p.BaseURL())
 	ctx := context.Background()
-	var cancelFn func()
+	//var cancelFn func()
 	// if timeout > 0 {
 	// 	ctx, cancelFn = context.WithTimeout(ctx, timeout)
 	// }
-	defer cancelFn()
+	//defer cancelFn()
 
 	files, err := p.List(ctx, p.Prefix())
 	if err != nil {
