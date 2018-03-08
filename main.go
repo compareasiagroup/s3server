@@ -79,9 +79,11 @@ func init() {
 	}
 }
 
+const modulesBasePath = "/modules/"
+
 func main() {
 	// create a new provider
-	p, err := newProvider(provider, bucket, s3Region, s3AccessKey, s3SecretKey)
+	p, err := newProvider(provider, bucket, modulesBasePath, s3Region, s3AccessKey, s3SecretKey)
 	if err != nil {
 		logrus.Fatalf("Creating new provider failed: %v", err)
 	}
@@ -123,6 +125,7 @@ func main() {
 	// static files handler
 	staticHandler := http.FileServer(http.Dir(staticDir))
 	mux.Handle("/", staticHandler)
+	mux.Handle(modulesBasePath, p)
 
 	// set up the server
 	server := &http.Server{
@@ -138,9 +141,9 @@ func main() {
 }
 
 type object struct {
-	Name    string
-	BaseURL string
-	Size    int64
+	Name     string
+	BasePath string
+	Size     int64
 }
 
 type data struct {

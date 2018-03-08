@@ -28,11 +28,11 @@
             {{ range $key, $value := .Files }}
             <tr>
                 <td valign="top">
-                    <a href="//{{$value.BaseURL}}/{{ $value.Name }}">
+                    <a href="{{$value.BasePath}}{{ $value.Name }}">
                         <img src="/icons/{{ $value.Name | ext }}.png" alt="[IMG]" /></a>
                 </td>
                 <td>
-                    <a href="//{{$value.BaseURL}}/{{ $value.Name }}">{{ $value.Name | base }}</a>
+                    <a href="{{$value.BasePath}}{{ $value.Name }}">{{ $value.Name | base }}</a>
                 </td>
                 <td align="right">{{ $value.Size | size }}</td>
             </tr>

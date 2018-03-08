@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -15,11 +16,12 @@ import (
 
 type cloud interface {
 	List(ctx context.Context, prefix string) ([]object, error)
+	ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	Prefix() string
 	BaseURL() string
 }
 
-func newProvider(provider, bucket, s3Region, s3AccessKey, s3SecretKey string) (cloud, error) {
+func newProvider(provider, bucket, modulesBasePath, s3Region, s3AccessKey, s3SecretKey string) (cloud, error) {
 	url, err := parseS3URI(bucket)
 	if err != nil {
 		return nil, err
@@ -32,7 +34,7 @@ func newProvider(provider, bucket, s3Region, s3AccessKey, s3SecretKey string) (c
 		prefix: strings.TrimPrefix(url.Path, "/"),
 	}
 	logrus.Info(p.bucket, p.prefix)
-	p.baseURL = p.bucket + ".s3.amazonaws.com"
+	p.basePath = modulesBasePath
 	return &p, nil
 }
 
