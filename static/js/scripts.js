@@ -56,12 +56,12 @@ if (el.textContent == 'Parent Directory'){
 // 	}
 // });
 
-var cells = document.querySelectorAll('td a');
-Array.prototype.forEach.call(cells, function(item, index){
-	var link = item.getAttribute('href');
-	link = link.replace('.html', '');
-	item.setAttribute('href', link);
-});
+// var cells = document.querySelectorAll('td a');
+// Array.prototype.forEach.call(cells, function(item, index){
+// 	var link = item.getAttribute('href');
+// 	link = link.replace('.html', '');
+// 	item.setAttribute('href', link);
+// });
 
 var our_table = document.querySelectorAll('table')[0];
 our_table.setAttribute('id', 'directory');
