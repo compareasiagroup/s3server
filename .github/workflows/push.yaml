@@ -1,9 +1,5 @@
 name: Build and Publish to ECR
-
-on:
-  push:
-    branches:
-    - master
+on: [push]
 
 jobs:
   build:
@@ -32,15 +28,17 @@ jobs:
         curl -sLo ghr.tar.gz https://github.com/tcnksm/ghr/releases/download/v0.12.2/ghr_v0.12.2_linux_amd64.tar.gz
         tar --strip-components=1 -xzf ghr.tar.gz
         
-        echo "-owner ${GITHUB_REPOSITORY/\/*/} -repository ${GITHUB_REPOSITORY/*\//} -replace ${GITHUB_REF#refs/tags/} build"
+        echo "-owner ${GITHUB_REPOSITORY/\/*/} -repository ${GITHUB_REPOSITORY/*\//} -replace ${GITHUB_REF#refs/tags/} cross"
 
-        ls -lah build
+        ls -lah cross
         # https://help.github.com/en/articles/virtual-environments-for-github-actions#default-environment-variables
         ./ghr -t ${GITHUB_TOKEN} -owner ${GITHUB_REPOSITORY/\/*/} -repository ${GITHUB_REPOSITORY/*\//} -replace ${GITHUB_REF#refs/tags/} cross
     
     - name: Build image
       if: startsWith(github.ref, 'refs/tags/') # only when pushing tags
       run: make docker/build
+      env:
+        ECR_REGISTRY_URL: ${{ secrets.ECR_REGISTRY_URL }}
 
     - name: Push image to ECR
       if: startsWith(github.ref, 'refs/tags/') # only when pushing tags
@@ -48,3 +46,5 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.ECR_AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.ECR_AWS_SECRET_ACCESS_KEY }}
+        ECR_REGISTRY_URL: ${{ secrets.ECR_REGISTRY_URL }}
+        ECR_REGION: ${{ secrets.ECR_REGION }}
