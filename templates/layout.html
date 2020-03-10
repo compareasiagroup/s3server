@@ -28,11 +28,11 @@
             {{ range $key, $value := .Files }}
             <tr>
                 <td valign="top">
-                    <a href="{{$value.BasePath}}{{ $value.Name }}">
-                        <img src="/icons/{{ $value.Name | ext }}.png" alt="[IMG]" /></a>
+                    <a href="{{$value.ProxyPath}}{{ $value.Name }}">
+                        <img src="/icons/default.png" alt="[IMG]" /></a>
                 </td>
                 <td>
-                    <a href="{{$value.BasePath}}{{ $value.Name }}">{{$value.BasePath}}{{ $value.Name | base }}</a>
+                    <a href="{{$value.ProxyPath}}{{ $value.Name }}">{{ trimPrefix $.BucketPrefix $value.Name }}</a>
                 </td>
                 <td align="right">{{ $value.Size | size }}</td>
             </tr>

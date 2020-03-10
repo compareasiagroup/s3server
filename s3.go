@@ -17,11 +17,11 @@ import (
 )
 
 type s3Provider struct {
-	bucket   string
-	prefix   string
-	basePath string
-	client   *s3.S3
-	ctx      context.Context
+	bucket    string
+	prefix    string
+	client    *s3.S3
+	ctx       context.Context
+	proxyPath string
 }
 
 // Prefix returns the prefix in an s3 bucket.
@@ -29,9 +29,9 @@ func (c *s3Provider) Prefix() string {
 	return c.prefix
 }
 
-// BaseURL returns the baseURL in an s3 bucket.
-func (c *s3Provider) BaseURL() string {
-	return c.basePath
+// ProxyPath returns the proxyPath in an s3 bucket.
+func (c *s3Provider) ProxyPath() string {
+	return c.proxyPath
 }
 
 // List returns the files in an s3 bucket.
@@ -42,9 +42,9 @@ func (c *s3Provider) List(ctx context.Context, prefix string) (files []object, e
 	}, func(p *s3.ListObjectsOutput, lastPage bool) bool {
 		for _, o := range p.Contents {
 			files = append(files, object{
-				Name:     aws.StringValue(o.Key),
-				Size:     aws.Int64Value(o.Size),
-				BasePath: c.basePath,
+				Name:      aws.StringValue(o.Key),
+				Size:      aws.Int64Value(o.Size),
+				ProxyPath: c.proxyPath,
 			})
 		}
 		return true // continue paging
@@ -56,10 +56,10 @@ func (c *s3Provider) List(ctx context.Context, prefix string) (files []object, e
 	return files, nil
 }
 
-// ServeHTTP gets files with c.basePath from the S3 bucket
+// ServeHTTP gets files for the c.proxyPath from the S3 bucket instead of through staticFileHandler
 func (c *s3Provider) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	key := strings.TrimPrefix(req.URL.Path, c.basePath)
-	logrus.Infof("Serving Module: %q from %q", key, c.bucket)
+	key := strings.TrimPrefix(req.URL.Path, c.proxyPath)
+	logrus.Infof("Proxying: %q from %q", key, c.bucket)
 	input := &s3.GetObjectInput{
 		Bucket: aws.String(c.bucket),
 		Key:    aws.String(key),
@@ -91,13 +91,15 @@ func (c *s3Provider) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	var contentType string
-	if resp.ContentType != nil {
-		contentType = *resp.ContentType
-	}
+	// if resp.ContentType != nil {
+	// 	contentType = *resp.ContentType
+	// 	log.Printf("resp.contentType: %v ", contentType)
+	// }
 
 	if contentType == "" {
 		ext := path.Ext(key)
 		contentType = mime.TypeByExtension(ext)
+		log.Printf("mime.contentType: %v ", contentType)
 	}
 
 	if resp.ETag != nil && *resp.ETag != "" {

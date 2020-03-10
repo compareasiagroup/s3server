@@ -4,15 +4,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
-	"text/template"
 	"time"
 
+	"github.com/Masterminds/sprig"
 	units "github.com/docker/go-units"
 	"github.com/jessfraz/s3server/version"
 	"github.com/sirupsen/logrus"
@@ -79,11 +79,11 @@ func init() {
 	}
 }
 
-const modulesBasePath = "/modules/"
+const proxyPath = "/proxy/"
 
 func main() {
 	// create a new provider
-	p, err := newProvider(provider, bucket, modulesBasePath, s3Region, s3AccessKey, s3SecretKey)
+	p, err := newProvider(provider, bucket, proxyPath, s3Region, s3AccessKey, s3SecretKey)
 	if err != nil {
 		logrus.Fatalf("Creating new provider failed: %v", err)
 	}
@@ -125,7 +125,7 @@ func main() {
 	// static files handler
 	staticHandler := http.FileServer(http.Dir(staticDir))
 	mux.Handle("/", staticHandler)
-	mux.Handle(modulesBasePath, p)
+	mux.Handle(proxyPath, p)
 
 	// set up the server
 	server := &http.Server{
@@ -141,21 +141,36 @@ func main() {
 }
 
 type object struct {
-	Name     string
-	BasePath string
-	Size     int64
+	Name      string
+	ProxyPath string
+	Size      int64
 }
 
 type data struct {
-	SiteURL     string
-	LastUpdated string
-	Files       []object
+	SiteURL      string
+	BucketPrefix string
+	LastUpdated  string
+	Files        []object
+}
+
+func funcMap() template.FuncMap {
+	f := sprig.FuncMap()
+	// Add some extra functionality
+	extra := template.FuncMap{
+		"size": func(s int64) string {
+			return units.HumanSize(float64(s))
+		},
+	}
+	for k, v := range extra {
+		f[k] = v
+	}
+	return f
 }
 
 func createStaticIndex(p cloud, staticDir string) error {
 	updating = true
 
-	logrus.Infof("fetching files from %s", p.BaseURL())
+	logrus.Infof("fetching files from %s", p.ProxyPath())
 	ctx := context.Background()
 	//var cancelFn func()
 	// if timeout > 0 {
@@ -166,20 +181,6 @@ func createStaticIndex(p cloud, staticDir string) error {
 	files, err := p.List(ctx, p.Prefix())
 	if err != nil {
 		return fmt.Errorf("Listing all files in bucket failed: %v", err)
-	}
-
-	// set up custom functions
-	funcMap := template.FuncMap{
-		"ext": func(name string) string {
-			return strings.TrimPrefix(filepath.Ext(name), ".")
-		},
-		"base": func(name string) string {
-			parts := strings.Split(name, "/")
-			return parts[len(parts)-1]
-		},
-		"size": func(s int64) string {
-			return units.HumanSize(float64(s))
-		},
 	}
 
 	// create temporoary file to save template to
@@ -197,10 +198,11 @@ func createStaticIndex(p cloud, staticDir string) error {
 	lp := filepath.Join(templateDir, "layout.html")
 
 	d := data{
-		Files:       files,
-		LastUpdated: time.Now().Local().Format(time.RFC1123),
+		Files:        files,
+		BucketPrefix: p.Prefix(),
+		LastUpdated:  time.Now().Local().Format(time.RFC1123),
 	}
-	tmpl := template.Must(template.New("").Funcs(funcMap).ParseFiles(lp))
+	tmpl := template.Must(template.New("").Funcs(funcMap()).ParseFiles(lp))
 	if err := tmpl.ExecuteTemplate(f, "layout", d); err != nil {
 		return fmt.Errorf("execute template failed: %v", err)
 	}

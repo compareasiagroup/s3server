@@ -18,10 +18,10 @@ type cloud interface {
 	List(ctx context.Context, prefix string) ([]object, error)
 	ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	Prefix() string
-	BaseURL() string
+	ProxyPath() string
 }
 
-func newProvider(provider, bucket, modulesBasePath, s3Region, s3AccessKey, s3SecretKey string) (cloud, error) {
+func newProvider(provider, bucket, proxyPath, s3Region, s3AccessKey, s3SecretKey string) (cloud, error) {
 	url, err := parseS3URI(bucket)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func newProvider(provider, bucket, modulesBasePath, s3Region, s3AccessKey, s3Sec
 		prefix: strings.TrimPrefix(url.Path, "/"),
 	}
 	logrus.Info(p.bucket, p.prefix)
-	p.basePath = modulesBasePath
+	p.proxyPath = proxyPath
 	return &p, nil
 }
 
