@@ -9,7 +9,7 @@ Static server for s3 files.
 $ s3server -h
 
  Server to index & view files from s3 bucket.
- Version: v0.2.0
+ Version: v0.2.1
  Build: e5a60e2
 
   -bucket string
