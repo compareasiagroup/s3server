@@ -46,7 +46,5 @@ $ docker run -d \
     -p 8080:8080 \
     --name s3server \
     --tmpfs /tmp \
-    quay.io/honestbee/s3server -bucket s3://hugthief/gifs -s3Region ap-southeast-1
+    ${ECR_REGISTRY_URL}/${ECR_REPO}:${VERSION} -bucket s3://hugthief/gifs -s3Region ap-southeast-1
 ```
-
-![screenshot](screenshot.png)

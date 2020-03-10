@@ -1,0 +1,50 @@
+name: Build and Publish to ECR
+
+on:
+  push:
+    branches:
+    - master
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-go@v1
+      with:
+        go-version: 1.12
+    - name: Set GOPATH
+      run: |
+        echo "##[set-env name=GOPATH;]$(dirname $GITHUB_WORKSPACE)"
+        echo "##[add-path]$(dirname $GITHUB_WORKSPACE)/bin"
+      shell: bash
+    - run: make release
+
+    # repository tag pushes also trigger webhook push events.
+    # https://help.github.com/en/articles/contexts-and-expression-syntax-for-github-actions#github-context
+    - name: Release binaries for tag
+      if: startsWith(github.ref, 'refs/tags/') # only when pushing tags
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # get ghr to simplify creating release and uploading binaries
+        curl -sLo ghr.tar.gz https://github.com/tcnksm/ghr/releases/download/v0.12.2/ghr_v0.12.2_linux_amd64.tar.gz
+        tar --strip-components=1 -xzf ghr.tar.gz
+        
+        echo "-owner ${GITHUB_REPOSITORY/\/*/} -repository ${GITHUB_REPOSITORY/*\//} -replace ${GITHUB_REF#refs/tags/} build"
+
+        ls -lah build
+        # https://help.github.com/en/articles/virtual-environments-for-github-actions#default-environment-variables
+        ./ghr -t ${GITHUB_TOKEN} -owner ${GITHUB_REPOSITORY/\/*/} -repository ${GITHUB_REPOSITORY/*\//} -replace ${GITHUB_REF#refs/tags/} cross
+    
+    - name: Build image
+      if: startsWith(github.ref, 'refs/tags/') # only when pushing tags
+      run: make docker/build
+
+    - name: Push image to ECR
+      if: startsWith(github.ref, 'refs/tags/') # only when pushing tags
+      run: make push
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.ECR_AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.ECR_AWS_SECRET_ACCESS_KEY }}

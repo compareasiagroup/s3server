@@ -26,12 +26,15 @@ GO_LDFLAGS_STATIC=-ldflags "-w $(CTIMEVAR) -extldflags -static"
 # List the GOOS and GOARCH to build
 GOOSARCHES = darwin/amd64 darwin/386 freebsd/amd64 freebsd/386 linux/arm linux/arm64 linux/amd64 linux/386 solaris/amd64 windows/amd64 windows/386
 
+ECR_REPO:=thirdparty/s3server
+DOCKER_TAG:=$(ECR_REGISTRY_URL)/$(ECR_REPO):$(VERSION)
+
 all: clean build fmt lint test staticcheck vet install ## Runs a clean, build, fmt, lint, test, staticcheck, vet and install
 
 .PHONY: build
 build: $(NAME) ## Builds a dynamic executable or package
 
-$(NAME): *.go VERSION
+$(NAME): *.go _VERSION
 	@echo "+ $@"
 	go build -tags "$(BUILDTAGS)" ${GO_LDFLAGS} -o $(NAME) .
 
@@ -43,7 +46,7 @@ static: ## Builds a static executable
 				${GO_LDFLAGS_STATIC} -o $(NAME) .
 
 .PHONY: fmt
-fmt: ## Verifies all files have men `gofmt`ed
+fmt: ## Verifies all files have been `gofmt`ed
 	@echo "+ $@"
 	@gofmt -s -l . | grep -v '.pb.go:' | grep -v vendor | tee /dev/stderr
 
@@ -89,12 +92,12 @@ GOOS=$(1) GOARCH=$(2) CGO_ENABLED=0 go build \
 	 -o $(BUILDDIR)/$(1)/$(2)/$(NAME) \
 	 -a -tags "$(BUILDTAGS) static_build netgo" \
 	 -installsuffix netgo ${GO_LDFLAGS_STATIC} .;
-md5sum $(BUILDDIR)/$(1)/$(2)/$(NAME) > $(BUILDDIR)/$(1)/$(2)/$(NAME).md5;
-sha256sum $(BUILDDIR)/$(1)/$(2)/$(NAME) > $(BUILDDIR)/$(1)/$(2)/$(NAME).sha256;
+# md5sum $(BUILDDIR)/$(1)/$(2)/$(NAME) > $(BUILDDIR)/$(1)/$(2)/$(NAME).md5;
+# sha256sum $(BUILDDIR)/$(1)/$(2)/$(NAME) > $(BUILDDIR)/$(1)/$(2)/$(NAME).sha256;
 endef
 
 .PHONY: cross
-cross: *.go VERSION ## Builds the cross-compiled binaries, creating a clean directory structure (eg. GOOS/GOARCH/binary)
+cross: *.go _VERSION ## Builds the cross-compiled binaries, creating a clean directory structure (eg. GOOS/GOARCH/binary)
 	@echo "+ $@"
 	$(foreach GOOSARCH,$(GOOSARCHES), $(call buildpretty,$(subst /,,$(dir $(GOOSARCH))),$(notdir $(GOOSARCH))))
 
@@ -103,12 +106,10 @@ GOOS=$(1) GOARCH=$(2) CGO_ENABLED=0 go build \
 	 -o $(BUILDDIR)/$(NAME)-$(1)-$(2) \
 	 -a -tags "$(BUILDTAGS) static_build netgo" \
 	 -installsuffix netgo ${GO_LDFLAGS_STATIC} .;
-md5sum $(BUILDDIR)/$(NAME)-$(1)-$(2) > $(BUILDDIR)/$(NAME)-$(1)-$(2).md5;
-sha256sum $(BUILDDIR)/$(NAME)-$(1)-$(2) > $(BUILDDIR)/$(NAME)-$(1)-$(2).sha256;
 endef
 
 .PHONY: release
-release: *.go VERSION ## Builds the cross-compiled binaries, naming them in such a way for release (eg. binary-GOOS-GOARCH)
+release: *.go _VERSION ## Builds the cross-compiled binaries, naming them in such a way for release (eg. binary-GOOS-GOARCH)
 	@echo "+ $@"
 	$(foreach GOOSARCH,$(GOOSARCHES), $(call buildrelease,$(subst /,,$(dir $(GOOSARCH))),$(notdir $(GOOSARCH))))
 
@@ -127,8 +128,21 @@ bump-version: ## Bump the version in the version file. Set BUMP to [ patch | maj
 
 .PHONY: tag
 tag: ## Create a new git tag to prepare to build a release
-	git tag -sa $(VERSION) -m "$(VERSION)"
-	@echo "Run git push origin $(VERSION) to push your new tag to GitHub and trigger a travis build."
+	git tag -a $(VERSION) -m "$(VERSION)"
+	@echo "Run git push origin $(VERSION) to push your new tag to GitHub and trigger Github Actions."
+
+.PHONY: docker/build
+docker/build: Dockerfile ## Build docker image based on Dockerfile
+	docker build --rm \
+		-t $(DOCKER_TAG) .
+
+.PHONY: docker/login
+docker/login: ## Log in to ECR
+	$$(aws ecr get-login --no-include-email --region $(ECR_REGION))
+
+.PHONY: push
+push: docker/login ## Log in and push Docker Image to ECR
+	docker push $(DOCKER_TAG)
 
 .PHONY: clean
 clean: ## Cleanup any build binaries or packages
@@ -138,4 +152,4 @@ clean: ## Cleanup any build binaries or packages
 
 .PHONY: help
 help:
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_\/-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
